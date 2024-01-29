@@ -1,11 +1,20 @@
 <script setup>
-import { defineProps, ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 
 import { NodeToolbar } from '@vue-flow/node-toolbar'
 
-import { EditOutlined, PlusOutlined, ArrowsAltOutlined, MinusCircleOutlined } from '@ant-design/icons-vue'
-// props were passed from the slot using `v-bind="customNodeProps"`
+import {
+  EditOutlined,
+  PlusOutlined,
+  ArrowsAltOutlined,
+  MinusCircleOutlined,
+} from '@ant-design/icons-vue'
+
+import { message } from 'ant-design-vue'
+import { useNeo4jStore } from '../../stores/neo4j'
+
+const neo4jStore = useNeo4jStore()
 const props = defineProps(['label', 'data', 'id'])
 
 let currentId = props.id
@@ -30,101 +39,139 @@ const setNewModalVisible = () => {
 }
 
 const newNodeForm = reactive({
-  id: "n-" + Math.random().toString(16).slice(2),
+  id: 'n-' + Math.random().toString(16).slice(2),
   name: '',
   labels: [],
-  props: []
+  props: [],
 })
 
 const currentNodeForm = reactive({
   id: props.id,
   name: props.label,
   labels: [],
-  props: []
+  props: [],
 })
 
 if (props.data.label) {
-
-  props.data.label.forEach(label => {
+  props.data.label.forEach((label) => {
     currentNodeForm.labels.push({
       text: label,
       id: Date.now(),
-    });
-  });
+    })
+  })
 }
 
 if (props.data.props) {
-  console.log(props.data.props);
-  props.data.props.forEach(prop => {
+  // props.data.props 是一个对象，将对象中的每个属性转换为数组
+  Object.keys(props.data.props).forEach((key) => {
     currentNodeForm.props.push({
-      key: '',
-      value: '',
+      key: key,
+      value: props.data.props[key],
       id: Date.now(),
-    });
-  });
+    })
+  })
 }
 
 const removeLabel = (item, form) => {
-  const index = form.labels.indexOf(item);
+  const index = form.labels.indexOf(item)
   if (index !== -1) {
-    form.labels.splice(index, 1);
+    form.labels.splice(index, 1)
   }
-};
+}
 const addLabel = (form) => {
   form.labels.push({
     text: '',
     id: Date.now(),
-  });
-};
+  })
+}
 
 const removeProp = (item, form) => {
-  const index = form.props.indexOf(item);
+  const index = form.props.indexOf(item)
   if (index !== -1) {
-    form.props.splice(index, 1);
+    form.props.splice(index, 1)
   }
-};
+}
 
 const addProp = (form) => {
   form.props.push({
     key: '',
     value: '',
     id: Date.now(),
-  });
-};
-
+  })
+}
 
 // 编辑节点对话框
 const handleEditModal = (e) => {
-  console.log(e);
+  console.log(e)
+  // 如果当前编辑的是匿名节点，则不允许编辑
+  if (currentLabel == 'anonymous') {
+    message.error('Anonymous node cannot be edited!')
+    return
+  } else {
+    setEditModalVisible()
+  }
+  // 从props中获取节点的label、data
+}
+
+const handleEditModalOk = (e) => {
+  console.log(e)
+  let oldQuery = neo4jStore.query
+  console.log(oldQuery)
+  // 在 oldQuery 字符串中，找到第一个的 props.label 的位置，存到数组中
+  let firstIndex = oldQuery.indexOf(props.label)
+  // 对于第一个位置，匹配到其之前的第一个括号和之后的第一个括号，将这中间的字符串替换为 currentNodeForm 的信息
+  let firstLeftIndex = oldQuery.lastIndexOf('(', firstIndex)
+  let firstRightIndex = oldQuery.indexOf(')', firstIndex)
+  // 将 currentNodeForm 的信息转换为字符串
+  let newLabels = currentNodeForm.labels.map((label) => label.text)
+  let newNodeInfo = `(${currentNodeForm.name}:${newLabels.join(
+    ':'
+  )} {${currentNodeForm.props
+    .map((prop) => `${prop.key}: '${prop.value}'`)
+    .join(', ')}})`
+
+  console.log(newNodeInfo)
+  // 替换第一个位置的字符串
+  let newQuery =
+    oldQuery.slice(0, firstLeftIndex) +
+    newNodeInfo +
+    oldQuery.slice(firstRightIndex + 1)
+
+  // 将 newQuery中所有的 props.label 替换为 currentNodeForm.name
+  newQuery = newQuery.replaceAll(props.label, currentNodeForm.name)
+  
+  neo4jStore.query = newQuery
+
   setEditModalVisible()
   // 从props中获取节点的label、data
+}
 
+const handleEditModalCancel = (e) => {
+  console.log(e)
+  setEditModalVisible()
 }
 
 // 新建节点对话框
 const handleNewModal = (e) => {
-  console.log(e);
+  console.log(e)
   setNewModalVisible()
   // 给 newNodeForm 生成随机id
   newNodeForm.id = Math.random().toString(36).substr(2, 8)
-
 }
 
 // 链接节点对话框
 const handleLinkModal = (e) => {
-  console.log(e);
+  console.log(e)
   setLinkModalVisible()
   // 从props中获取节点的label、data
-
 }
 
-
-
-
 onMounted(() => {
-  console.log(props.data)
   // 读取 data 中的 hsl color
-  const color = props.data.color
+  let color = props.data.color
+  if (props.label == 'anonymous') {
+    color = '#ffffff'
+  }
   // 设置节点内的背景色
   const node = document.getElementById(props.id)
   // 获取节点name、label、props的 div
@@ -151,10 +198,12 @@ onMounted(() => {
       nodeProps[i].style.backgroundColor = newColor
     }
   }
+
+  // 如果节点data中有 result 属性，则将 nodeName 的字体设置为粗体，颜色为红色，字体大小为 20px
+  if (props.data.result) {
+    nodeName.style.fontWeight = 'bold'
+  }
 })
-
-
-
 </script>
 
 <template>
@@ -165,23 +214,30 @@ onMounted(() => {
     </div>
     <!-- label -->
     <div class="custom-vql-lable" v-if="props.data.label !== null">
-      <div class="custom-vql-lable-item" v-for=" value in props.data.label">
+      <div class="custom-vql-lable-item" v-for="value in props.data.label">
         {{ value }}
       </div>
     </div>
     <!-- props -->
     <div class="custom-vql-props" v-if="props.data.props !== null">
-      <div class="custom-vql-props-item" v-for=" (value, key) in props.data.props">
+      <div
+        class="custom-vql-props-item"
+        v-for="(value, key) in props.data.props"
+      >
         <div class="custom-vql-props-item-key">{{ key }}:</div>
         <div class="custom-vql-props-item-value">
-          {{ value }}</div>
+          {{ value }}
+        </div>
       </div>
     </div>
   </div>
 
   <!-- 节点工具栏 -->
-  <NodeToolbar style="display: flex; gap: 0.5rem; align-items: center" :is-visible="data.toolbarVisible"
-    :position="data.toolbarPosition">
+  <NodeToolbar
+    style="display: flex; gap: 0.5rem; align-items: center"
+    :is-visible="data.toolbarVisible"
+    :position="data.toolbarPosition"
+  >
     <!-- 编辑节点按钮 -->
     <a-tooltip placement="top">
       <template #title>
@@ -220,19 +276,43 @@ onMounted(() => {
   </NodeToolbar>
 
   <!-- 编辑节点对话框 -->
-  <a-modal v-model:open="editModalVisible" title="Edit current node" centered @ok="setEditModalVisible">
-    <a-form ref="formRef" name="dynamic_form_nest_item" :label-col="{ span: 4 }" :wrapper-col="{ span: 16 }"
-      :model="currentNodeForm" @finish="onFinish">
+  <a-modal
+    v-model:open="editModalVisible"
+    title="Edit current node"
+    centered
+    @ok="setEditModalVisible"
+  >
+    <a-form
+      name="editNode-Form"
+      :label-col="{ span: 4 }"
+      :wrapper-col="{ span: 16 }"
+      :model="currentNodeForm"
+      @finish="onFinish"
+    >
       <!-- 编辑节点 Symbol 输入框 -->
       <a-form-item label="Name" name="name">
-        <a-input placeholder="Please enter the variable name of the node" v-model:value="currentNodeForm.name" />
+        <a-input
+          placeholder="Please enter the variable name of the node"
+          v-model:value="currentNodeForm.name"
+        />
       </a-form-item>
 
       <!-- 编辑节点 Label 输入框 -->
-      <a-form-item label="Label" v-for="(label, index) in currentNodeForm.labels" class="modal-label-editor-container">
+      <a-form-item
+        label="Label"
+        v-for="(label, index) in currentNodeForm.labels"
+        class="modal-label-editor-container"
+      >
         <a-space>
-          <a-input class="modal-label-editor-inputer" v-model:value="label.text" placeholder="label" />
-          <MinusCircleOutlined class="modal-delete" @click="removeLabel(label, currentNodeForm)" />
+          <a-input
+            class="modal-label-editor-inputer"
+            v-model:value="label.text"
+            placeholder="label"
+          />
+          <MinusCircleOutlined
+            class="modal-delete"
+            @click="removeLabel(label, currentNodeForm)"
+          />
         </a-space>
       </a-form-item>
 
@@ -240,42 +320,93 @@ onMounted(() => {
       <a-form-item label="Props" v-for="(prop, index) in currentNodeForm.props">
         <a-space>
           <a-input-group>
-            <a-input v-model:value="prop.key" style="width: 50%" placeholder="key" />
-            <a-input v-model:value="prop.value" style="width: 50%" placeholder="value" />
+            <a-input
+              v-model:value="prop.key"
+              style="width: 50%"
+              placeholder="key"
+            />
+            <a-input
+              v-model:value="prop.value"
+              style="width: 50%"
+              placeholder="value"
+            />
           </a-input-group>
-          <MinusCircleOutlined class="modal-delete" @click="removeProp(prop, currentNodeForm)" />
+          <MinusCircleOutlined
+            class="modal-delete"
+            @click="removeProp(prop, currentNodeForm)"
+          />
         </a-space>
       </a-form-item>
-
-
     </a-form>
     <template #footer>
       <!-- 新标签按钮，点击增加新的label输入框 -->
-      <a-button class="modal-button" key="addLabel" type="dashed" @click="addLabel(currentNodeForm)">
+      <a-button
+        class="modal-button"
+        key="addLabel"
+        type="dashed"
+        @click="addLabel(currentNodeForm)"
+      >
         <a-plus-outlined /> Add label
       </a-button>
-      <a-button class="modal-button" type="dashed" @click="addProp(currentNodeForm)">
+      <a-button
+        class="modal-button"
+        type="dashed"
+        @click="addProp(currentNodeForm)"
+      >
         <a-plus-outlined /> Add prop
       </a-button>
-      <a-button class="modal-button" key="back" @click="handleCancel">Cancel</a-button>
-      <a-button class="modal-button" key="submit" type="primary" :loading="loading" @click="handleOk">Submit</a-button>
+      <a-button class="modal-button" key="back" @click="handleEditModalCancel"
+        >Cancel</a-button
+      >
+      <a-button
+        class="modal-button"
+        key="submit"
+        type="primary"
+        :loading="loading"
+        @click="handleEditModalOk"
+        >Submit</a-button
+      >
     </template>
   </a-modal>
 
   <!-- 新建节点对话框 -->
-  <a-modal v-model:open="newModalVisible" title="Add a new node" centered @ok="setNewModalVisible">
-    <a-form ref="formRef" name="dynamic_form_nest_item" :label-col="{ span: 4 }" :wrapper-col="{ span: 16 }"
-      :model="newNodeForm" @finish="onFinish">
+  <a-modal
+    v-model:open="newModalVisible"
+    title="Add a new node"
+    centered
+    @ok="setNewModalVisible"
+  >
+    <a-form
+      name="newNode-Form"
+      :label-col="{ span: 4 }"
+      :wrapper-col="{ span: 16 }"
+      :model="newNodeForm"
+      @finish="onFinish"
+    >
       <!-- 新节点 Symbol 输入框 -->
       <a-form-item label="Name" name="name">
-        <a-input placeholder="Please enter the variable name of the node" v-model:value="newNodeForm.symbol" />
+        <a-input
+          placeholder="Please enter the variable name of the node"
+          v-model:value="newNodeForm.symbol"
+        />
       </a-form-item>
 
       <!-- 新节点 Label 输入框 -->
-      <a-form-item label="Label" v-for="(label, index) in newNodeForm.labels" class="modal-label-editor-container">
+      <a-form-item
+        label="Label"
+        v-for="(label, index) in newNodeForm.labels"
+        class="modal-label-editor-container"
+      >
         <a-space>
-          <a-input class="modal-label-editor-inputer" v-model:value="label.text" placeholder="label" />
-          <MinusCircleOutlined class="modal-delete" @click="removeLabel(label, newNodeForm)" />
+          <a-input
+            class="modal-label-editor-inputer"
+            v-model:value="label.text"
+            placeholder="label"
+          />
+          <MinusCircleOutlined
+            class="modal-delete"
+            @click="removeLabel(label, newNodeForm)"
+          />
         </a-space>
       </a-form-item>
 
@@ -283,33 +414,63 @@ onMounted(() => {
       <a-form-item label="Props" v-for="(prop, index) in newNodeForm.props">
         <a-space>
           <a-input-group>
-            <a-input v-model:value="prop.key" style="width: 50%" placeholder="key" />
-            <a-input v-model:value="prop.value" style="width: 50%" placeholder="value" />
+            <a-input
+              v-model:value="prop.key"
+              style="width: 50%"
+              placeholder="key"
+            />
+            <a-input
+              v-model:value="prop.value"
+              style="width: 50%"
+              placeholder="value"
+            />
           </a-input-group>
-          <MinusCircleOutlined class="modal-delete" @click="removeProp(prop, newNodeForm)" />
+          <MinusCircleOutlined
+            class="modal-delete"
+            @click="removeProp(prop, newNodeForm)"
+          />
         </a-space>
       </a-form-item>
-
-
     </a-form>
     <template #footer>
       <!-- 新标签按钮，点击增加新的label输入框 -->
-      <a-button class="modal-button" key="addLabel" type="dashed" @click="addLabel(newNodeForm)">
+      <a-button
+        class="modal-button"
+        key="addLabel"
+        type="dashed"
+        @click="addLabel(newNodeForm)"
+      >
         <a-plus-outlined /> Add label
       </a-button>
-      <a-button class="modal-button" type="dashed" @click="addProp(newNodeForm)">
+      <a-button
+        class="modal-button"
+        type="dashed"
+        @click="addProp(newNodeForm)"
+      >
         <a-plus-outlined /> Add prop
       </a-button>
-      <a-button class="modal-button" key="back" @click="handleCancel">Cancel</a-button>
-      <a-button class="modal-button" key="submit" type="primary" :loading="loading" @click="handleOk">Submit</a-button>
+      <a-button class="modal-button" key="back" @click="handleCancel"
+        >Cancel</a-button
+      >
+      <a-button
+        class="modal-button"
+        key="submit"
+        type="primary"
+        :loading="loading"
+        @click="handleOk"
+        >Submit</a-button
+      >
     </template>
   </a-modal>
 
   <!-- 链接节点对话框 -->
-  <a-modal v-model:open="linkModalVisible" title="Link to ..." centered @ok="setLinkModalVisible">
-
+  <a-modal
+    v-model:open="linkModalVisible"
+    title="Link to ..."
+    centered
+    @ok="setLinkModalVisible"
+  >
   </a-modal>
-
 
   <Handle class="custom-vql-handle" type="target" />
   <Handle class="custom-vql-handle" type="source" />
@@ -320,7 +481,6 @@ onMounted(() => {
   width: 100px;
   max-height: 200px;
 }
-
 
 .custom-vql-name {
   width: 100px;

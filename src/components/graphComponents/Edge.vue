@@ -1,5 +1,12 @@
 <script setup>
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, getSmoothStepPath, getStraightPath, useVueFlow } from '@vue-flow/core'
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  getBezierPath,
+  getSmoothStepPath,
+  getStraightPath,
+  useVueFlow,
+} from '@vue-flow/core'
 import { computed, onMounted } from 'vue'
 
 const props = defineProps({
@@ -51,15 +58,16 @@ const props = defineProps({
 
 const { removeEdges } = useVueFlow()
 
-const path = computed(() => getStraightPath({
-  sourceX: props.sourceX,
-  sourceY: props.sourceY,
-  targetX: props.targetX,
-  targetY: props.targetY,
-  sourcePosition: props.sourcePosition,
-  targetPosition: props.targetPosition,
-}))
-
+const path = computed(() =>
+  getStraightPath({
+    sourceX: props.sourceX,
+    sourceY: props.sourceY,
+    targetX: props.targetX,
+    targetY: props.targetY,
+    sourcePosition: props.sourcePosition,
+    targetPosition: props.targetPosition,
+  })
+)
 
 onMounted(() => {
   // console.log(props.data)
@@ -73,12 +81,17 @@ onMounted(() => {
   const edgePropsDiv = edgeLabel.getElementsByClassName('custom-vql-props-item')
   // 如果存在，则设置节点edgePath、edgeLabelDiv、edgePropsDiv的背景色
   if (edgePath) {
-    edgePath.style.stroke = color
+    if (props.data.type && props.data.type === 'notEdges') {
+      edgePath.style.stroke = '#ee7777'
+    } else {
+      edgePath.style.stroke = color
+      edgePath.style.strokeWidth = '3px'
+    }
   }
-  
+
   if (edgeLabelDiv) {
     // 在 rgb color 上，叠加一层 rgba(0, 0, 0, 0.2)
-    let newColor = `rgba(${color.slice(4, -1)}, 0.2)`
+    let newColor = `rgba(${color.slice(4, -1)}, 1)`
     // 将每个label的背景色设置为newColor
     for (let i = 0; i < edgeLabelDiv.length; i++) {
       edgeLabelDiv[i].style.backgroundColor = newColor
@@ -92,10 +105,7 @@ onMounted(() => {
       edgePropsDiv[i].style.backgroundColor = newColor
     }
   }
-
-
 })
-
 </script>
 
 <script>
@@ -106,28 +116,42 @@ export default {
 
 <template>
   <!-- You can use the `BaseEdge` component to create your own custom edge more easily -->
-  <BaseEdge class="custom-edge" :id="id + '-path'" :style="style" :path="path[0]" :marker-end="markerEnd"
-    style="z-index: 1" />
+  <BaseEdge
+    class="custom-edge"
+    :id="id + '-path'"
+    :style="style"
+    :path="path[0]"
+    :marker-end="markerEnd"
+    style="z-index: 1"
+  />
 
   <!-- Use the `EdgeLabelRenderer` to escape the SVG world of edges and render your own custom label in a `<div>` ctx -->
   <EdgeLabelRenderer>
-    <div :id="id + '-label'" :style="{
-      pointerEvents: 'all',
-      position: 'absolute',
-      transform: `translate(-50%, -50%) translate(${path[1]}px,${path[2]}px)`,
-    }" class="nodrag nopan">
+    <div
+      :id="id + '-label'"
+      :style="{
+        pointerEvents: 'all',
+        position: 'absolute',
+        transform: `translate(-50%, -50%) translate(${path[1]}px,${path[2]}px)`,
+      }"
+      class="nodrag nopan"
+    >
       <!-- label -->
       <div class="custom-vql-lable" v-if="props.data.label !== null">
-        <div class="custom-vql-lable-item" v-for=" value in props.data.label">
+        <div class="custom-vql-lable-item" v-for="value in props.data.label">
           {{ value }}
         </div>
       </div>
       <!-- props -->
       <div class="custom-vql-props" v-if="props.data.props !== null">
-        <div class="custom-vql-props-item" v-for=" (value, key) in props.data.props">
+        <div
+          class="custom-vql-props-item"
+          v-for="(value, key) in props.data.props"
+        >
           <div class="custom-vql-props-item-key">{{ key }}:</div>
           <div class="custom-vql-props-item-value">
-            {{ value }}</div>
+            {{ value }}
+          </div>
         </div>
       </div>
     </div>

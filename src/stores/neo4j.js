@@ -17,7 +17,12 @@ export const useNeo4jStore = defineStore("neo4jLinker", {
         password: "lizhaozhuo1027",
       },
       driver: null,
-      query: `MATCH (keanu:Person:Human {name:'Keanu Reeves', age:16})-[:ACTED_IN]->(movie1:Movie)<-[:ACTED_IN]-(coActors:Person),\n \t(coActors:Person)-[:ACTED_IN]->(movie2:Movie)<-[:ACTED_IN]-(cocoActors:Person)\nWHERE NOT (keanu)-[:ACTED_IN]->(movieX)<-[:ACTED_IN]-(cocoActors) AND keanu <> cocoActors\nRETURN cocoActors.name AS recommended, count(cocoActors) AS strength\nORDER BY strength DESC\nLIMIT 7`,
+      query: `MATCH (keanu:Person {name:'Keanu Reeves'})-[:ACTED_IN]->(movie1:Movie)<-[:ACTED_IN]-(coActors:Person),
+  (coActors:Person)-[:ACTED_IN]->(movie2:Movie)<-[:ACTED_IN]-(cocoActors:Person)
+WHERE NOT (keanu)-[:ACTED_IN]->()<-[:ACTED_IN]-(cocoActors) AND keanu <> cocoActors
+RETURN cocoActors.name AS recommended, count(cocoActors) AS strength
+ORDER BY strength DESC
+LIMIT 7`,
       ast: {},
       vqlGraph: null,
       result: null,
